@@ -18,7 +18,6 @@ import static com.yize.downloader.DownloadStatus.*;
 
 public class ConcurrentDownloader {
     private static final String TAG="ConcurrentDownloader";
-    private static int DEFAULT_THREAD_COUNT=128;
     protected DownloadStatus downloadStatus;
 
     private ExecutorService executorService;
@@ -30,12 +29,30 @@ public class ConcurrentDownloader {
 
 
     private DownloadListener mainDownloadListener;
+    /**
+     * 执行当前任务的总线程数量
+     */
     private int totalThreadCount;
+    /**
+     * 当前完成操作的线程
+     */
     private int finishedThreadCount=0;
+    /**
+     * 暂停列表
+     */
     private List<LocalFileInfo> pauseList=new ArrayList<>();
+    /**
+     * 已下载的文件长度
+     */
     private volatile long downloadedLength=0;
+    /**
+     * 同步锁
+     */
     private static final String LOCK="downloadLock";
 
+    /**
+     * 每个线程共用这一个回调接口
+     */
     private ConcurrentDownloadListener partDownloadListener=new ConcurrentDownloadListener() {
         public void onSuccess(int threadId) {
             System.out.println("线程："+threadId+"下载完成");
@@ -55,15 +72,23 @@ public class ConcurrentDownloader {
             if(downloadedLength<1024){
                 Log.i(TAG,"已下载："+downloadedLength+"B");
             }else if(downloadedLength<1024*1024){
-                Log.i(TAG,"已下载："+downloadedLength/1024+"KB");
+                Log.i(TAG,"已下载："+(downloadedLength>>>10)+"KB");
             }else if(downloadedLength<1024*1024*1024){
-                Log.i(TAG,"已下载："+downloadedLength/1024/1024+"MB");
+                Log.i(TAG,"已下载："+(downloadedLength>>>20)+"MB");
             }else {
-                Log.i(TAG,"已下载："+downloadedLength/1024/1024/1024+"GB");
+                Log.i(TAG,"已下载："+(downloadedLength>>>30)+"GB");
             }
 
         }
 
+        /**
+         * 暂停下载后，讲下载信息写入本地文件，等待恢复
+         * @param filename
+         * @param threadId
+         * @param startPos
+         * @param downloadedLen
+         * @param endPos
+         */
         public synchronized void onPause(String filename,int threadId,long startPos,long downloadedLen,long endPos) {
             LocalFileInfo localFileInfo=new LocalFileInfo(filename,threadId,startPos,downloadedLen,endPos);
             pauseList.add(localFileInfo);
@@ -87,13 +112,24 @@ public class ConcurrentDownloader {
         }
     };
 
+    /**
+     * 暴露给派发器的接口，开始下载
+     * @param links
+     * @param threadCount
+     * @param listener
+     */
     public void startDownload(String links,int threadCount,DownloadListener listener){
         mainDownloadListener=listener;
         downloadStatus=PROGRESS;
         totalThreadCount=threadCount;
-
+        /**
+         * 获取需要下载的文件长度
+         */
         long totalLen=getTotalLength(links);
         File file=new File("D:/"+ links.substring(links.lastIndexOf("/")));
+        /**
+         * 如果本地存在文件，那就从本地恢复信息，否则新创建下载信息
+         */
         if(file.exists()){
             if(file.length()!=totalLen){
                 Log.i(TAG,"本地文件与服务器文件不一致");
@@ -143,11 +179,27 @@ public class ConcurrentDownloader {
         return len;
     }
 
+    /**
+     * 从本地恢复暂停的线程信息
+     * @param downloadLink
+     * @param infos
+     * @param file
+     * @param listener
+     */
     private void restartDownload(String downloadLink,List<LocalFileInfo> infos,File file,ConcurrentDownloadListener listener){
         for (LocalFileInfo info:infos){
             executorService.submit(new PartDownloadRunnable(info.getThreadId(),downloadLink,info.getStartPos()+info.getDownloadedLen(),info.getEndPos(),file,listener));
         }
     }
+
+    /**
+     * 新创建
+     * @param downloadLink
+     * @param totalLen
+     * @param threadCount
+     * @param file
+     * @param listener
+     */
 
     private void requestNewDownload(String downloadLink,long totalLen,int threadCount,File file,ConcurrentDownloadListener listener){
         long partLen=(totalLen+threadCount)/threadCount;
@@ -162,6 +214,9 @@ public class ConcurrentDownloader {
         }
     }
 
+    /**
+     * 执行下载的线程实体类
+     */
     class PartDownloadRunnable implements Runnable{
         private final int threadId;
         private final String downloadLink;
@@ -222,16 +277,18 @@ public class ConcurrentDownloader {
     }
 
 
-
+    /**
+     * 取消下载，暴露给外部调用
+     */
     public void cancelDownload(){
         downloadStatus=CANCELED;
     }
 
+    /**
+     * 暂停下载
+     */
     public void pauseDownload(){
         downloadStatus=PAUSE;
     }
 
-    public void stop(){
-        executorService.shutdown();
-    }
 }
