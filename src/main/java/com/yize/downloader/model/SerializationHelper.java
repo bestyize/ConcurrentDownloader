@@ -1,9 +1,8 @@
-package com.yize.downloader;
+package com.yize.downloader.model;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 
 public class SerializationHelper {

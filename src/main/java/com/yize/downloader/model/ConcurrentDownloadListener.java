@@ -1,10 +1,10 @@
-package com.yize.downloader;
+package com.yize.downloader.model;
 
 import java.io.File;
 
 public interface ConcurrentDownloadListener {
     void onSuccess(int threadId);
-    void onProgress(long progress);
+    void onProgress(String links,long progress);
 
     /**
      * 暂停后记录下载长度

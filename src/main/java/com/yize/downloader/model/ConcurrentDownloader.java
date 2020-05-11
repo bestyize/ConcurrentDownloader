@@ -1,20 +1,15 @@
-package com.yize.downloader;
+package com.yize.downloader.model;
 
 import com.yize.downloader.log.Log;
-import org.omg.PortableServer.LIFESPAN_POLICY_ID;
 
 import java.io.*;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
-import static com.yize.downloader.DownloadStatus.*;
+import static com.yize.downloader.model.DownloadStatus.*;
 
 public class ConcurrentDownloader {
     private static final String TAG="ConcurrentDownloader";
@@ -50,6 +45,8 @@ public class ConcurrentDownloader {
      */
     private static final String LOCK="downloadLock";
 
+    private long totalLength;
+
     /**
      * 每个线程共用这一个回调接口
      */
@@ -64,11 +61,21 @@ public class ConcurrentDownloader {
 
         }
 
-        public void onProgress(long progress) {
+        public void onProgress(String links,long progress) {
             synchronized (LOCK){
                 downloadedLength+=progress;
+                mainDownloadListener.onProgress(links,downloadedLength,totalLength);
             }
 
+
+
+        }
+
+        /**
+         * 计算下载了多少
+         * @param downloadedLength
+         */
+        private void calculatorProgress(long downloadedLength){
             if(downloadedLength<1024){
                 Log.i(TAG,"已下载："+downloadedLength+"B");
             }else if(downloadedLength<1024*1024){
@@ -78,7 +85,6 @@ public class ConcurrentDownloader {
             }else {
                 Log.i(TAG,"已下载："+(downloadedLength>>>30)+"GB");
             }
-
         }
 
         /**
@@ -94,8 +100,9 @@ public class ConcurrentDownloader {
             pauseList.add(localFileInfo);
             if(pauseList.size()==totalThreadCount){
                 SerializationHelper.writeToDisk(pauseList);
-                System.out.println("全部暂停，序列化进度到本地文件");
                 executorService.shutdown();
+                mainDownloadListener.onPause(localFileInfo);
+
             }
         }
 
@@ -126,6 +133,7 @@ public class ConcurrentDownloader {
          * 获取需要下载的文件长度
          */
         long totalLen=getTotalLength(links);
+        this.totalLength=totalLen;
         File file=new File("D:/"+ links.substring(links.lastIndexOf("/")));
         /**
          * 如果本地存在文件，那就从本地恢复信息，否则新创建下载信息
@@ -263,7 +271,7 @@ public class ConcurrentDownloader {
                         raf.write(b,0,len);
                     }
                     downloadedLength+=len;
-                    listener.onProgress(len);
+                    listener.onProgress(downloadLink,len);
                 }
                 raf.close();
                 reader.close();

@@ -1,4 +1,4 @@
-package com.yize.downloader;
+package com.yize.downloader.model;
 
 import java.io.Serializable;
 

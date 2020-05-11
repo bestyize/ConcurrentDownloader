@@ -1,6 +1,8 @@
-package com.yize.downloader;
+package com.yize.downloader.model;
 
 
+import java.lang.ref.WeakReference;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class DownloadDispatcher {
@@ -9,6 +11,7 @@ public class DownloadDispatcher {
      */
     private static int DEFAULT_THREAD_COUNT=128;
     private ExecutorService executorService;
+    private Map<String, ConcurrentDownloader> TASK_MAP=new ConcurrentHashMap<>();
     /**
      * 双检锁单例模式
      */
@@ -33,9 +36,9 @@ public class DownloadDispatcher {
      * @param threadCount
      */
     public DownloadDispatcher(int threadCount) {
-        executorService=new ThreadPoolExecutor(threadCount
+        executorService=new ThreadPoolExecutor(64
                 ,threadCount
-                ,0
+                ,10
                 , TimeUnit.SECONDS
                 ,new ArrayBlockingQueue<Runnable>(threadCount)
                 ,new ConcurrentThreadFactory()
@@ -68,8 +71,16 @@ public class DownloadDispatcher {
      * @param listener
      */
     public void dispatchNewTask(String downloadLink,int threadNum,DownloadListener listener){
-        final ConcurrentDownloader downloader=new ConcurrentDownloader(this.executorService);
+        ConcurrentDownloader downloader=new ConcurrentDownloader(this.executorService);
+        TASK_MAP.put(downloadLink,downloader);
         downloader.startDownload(downloadLink,threadNum,listener);
+    }
+
+    public void pauseDownload(String downloadLink){
+        if(!TASK_MAP.containsKey(downloadLink)){
+            return;
+        }
+        TASK_MAP.remove(downloadLink).pauseDownload();
     }
 
 }
