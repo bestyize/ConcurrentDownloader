@@ -16,10 +16,7 @@ public class MainActivity extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
     }
-//更多请阅读：https://www.yiibai.com/javafx/javafx_gridpane.html
-
-
-
+    //更多请阅读：https://www.yiibai.com/javafx/javafx_gridpane.html
     public static void main(String[] args) {
         launch(args);
     }
